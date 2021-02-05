@@ -21,6 +21,7 @@ While this is not a real FTP server, it handles basic commands like:
 
 - cd
 - ls
+- cat
 
 The program accepts a `-path ./public` as the root path to point the server to.
 
