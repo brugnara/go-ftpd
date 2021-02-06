@@ -5,10 +5,10 @@ Go FTP
 As a default behaviour, `./public` folder with examples is served.
 
 ```bash
-go run *.go
+go run .
 
 #
-go run *.go --path /home/$USER
+go run . --path /home/$USER
 ```
 
 Then connect to it:
