@@ -10,7 +10,7 @@ import (
 	"text/tabwriter"
 )
 
-type ftp struct {
+type ftpd struct {
 	root string
 	path string
 }
@@ -29,29 +29,33 @@ const (
 ┻┳|`
 )
 
-func newFtp(p string) *ftp {
+func newFtp(p string) *ftpd {
+	p = strings.TrimSpace(p)
 	p = path.Clean(p)
-	return &ftp{p, p}
+	if p == "" || p == "." {
+		p = "./public"
+	}
+	return &ftpd{p, p}
 }
 
-func (f ftp) hello(c io.Writer) {
+func (f ftpd) hello(c io.Writer) {
 	fmt.Fprintf(c, "\n%s\nWelcome.\nBrugnara made this in 2021.\n", wall)
 	f.help(c)
 	f.cursor(c)
 }
 
-func (f ftp) cursor(c io.Writer) {
+func (f ftpd) cursor(c io.Writer) {
 	fmt.Fprintf(c, "$ %s > ", f.currentPath())
 }
 
-func (f ftp) help(c io.Writer) {
+func (f ftpd) help(c io.Writer) {
 	fmt.Fprintln(c, `Available commands:
     - ls
     - cd <folder>
     - cat <file>`)
 }
 
-func (f *ftp) command(c io.Writer, cmd string) {
+func (f *ftpd) command(c io.Writer, cmd string) bool {
 	defer func() {
 		f.cursor(c)
 	}()
@@ -61,36 +65,45 @@ func (f *ftp) command(c io.Writer, cmd string) {
 
 	if len(xc) == 0 {
 		fmt.Fprintf(c, "%s\n", errorInvalidCommand)
-		return
+		return false
 	}
 
 	switch xc[0] {
 	default:
 		fmt.Fprintf(c, "%s\n", errorInvalidCommand)
+		return false
 	case "cd":
 		if len(xc) != 2 {
 			fmt.Fprintf(c, "%s\n", errorIncompleteCommand)
-			return
+			return false
 		}
-		f.cd(c, xc[1])
+		return f.cd(c, xc[1])
 	case "cat":
-		f.cat(c, xc[1])
+		if len(xc) != 2 {
+			fmt.Fprintf(c, "%s\n", errorIncompleteCommand)
+			return false
+		}
+		return f.cat(c, xc[1])
 	case "ls":
-		f.ls(c)
+		return f.ls(c)
 	case "quit":
 		fmt.Fprintln(c, "Bye!")
 	}
+	return true
 }
 
-func (f *ftp) cd(c io.Writer, dir string) {
-	if p, err := f.wannaBe(dir); err != nil {
+func (f *ftpd) cd(c io.Writer, dir string) bool {
+	p, err := f.wannaBe(dir)
+	if err != nil {
 		fmt.Fprintln(c, errorPathInvalid)
-	} else {
-		f.path = p
+		return false
 	}
+	f.path = p
+	return true
+
 }
 
-func (f ftp) wannaBe(dir string) (string, error) {
+func (f ftpd) wannaBe(dir string) (string, error) {
 	p := path.Clean(path.Join(f.root, f.currentPath(), dir))
 	if !strings.HasPrefix(p, f.root) {
 		p = path.Join(f.root, p)
@@ -103,18 +116,18 @@ func (f ftp) wannaBe(dir string) (string, error) {
 	return p, nil
 }
 
-func (f ftp) ls(c io.Writer) {
+func (f ftpd) ls(c io.Writer) bool {
 	fl, err := os.Open(path.Join(f.root, f.currentPath()))
 	if err != nil {
 		fmt.Fprintf(c, "%s\n", errorPathInvalid)
-		return
+		return false
 	}
 	defer fl.Close()
 
 	xf, err := fl.Readdir(-1)
 	if err != nil {
 		fmt.Fprintf(c, "%s\n", errorPathInvalid)
-		return
+		return false
 	}
 	tab := tabwriter.NewWriter(c, 0, 8, 2, ' ', 0)
 	fmt.Fprintln(tab, "Size\tType\tName")
@@ -135,9 +148,10 @@ func (f ftp) ls(c io.Writer) {
 		}, "\t"))
 	}
 	tab.Flush()
+	return true
 }
 
-func (f ftp) currentPath() string {
+func (f ftpd) currentPath() string {
 	ret := strings.Replace(f.path, f.root, "", -1)
 	if ret == "" {
 		ret = "/"
@@ -145,31 +159,29 @@ func (f ftp) currentPath() string {
 	return ret
 }
 
-func (f ftp) cat(c io.Writer, file string) {
-	quitError := func(err error, output string) {
+func (f ftpd) cat(c io.Writer, file string) bool {
+	quitError := func(err error, output string) bool {
 		log.Println(err)
 		fmt.Fprintln(c, output)
+		return false
 	}
 	//
 	file, err := f.wannaBe(file)
 	if err != nil {
-		quitError(err, errorCantOpenDir)
-		return
+		return quitError(err, errorCantOpenDir)
 	}
 	fl, err := os.Open(file)
 	if err != nil {
-		quitError(err, errorCantOpenDir)
-		return
+		return quitError(err, errorCantOpenDir)
 	}
 	defer fl.Close()
 	stat, err := fl.Stat()
 	if err != nil || stat.IsDir() {
-		quitError(err, errorCantOpenDir)
-		return
+		return quitError(err, errorCantOpenDir)
 	}
 	if stat.Size() > pow(1024, 2) {
-		quitError(nil, errorFileTooBig)
-		return
+		return quitError(nil, errorFileTooBig)
 	}
-	io.Copy(c, fl)
+	_, err = io.Copy(c, fl)
+	return err == nil
 }
