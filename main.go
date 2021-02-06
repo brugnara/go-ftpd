@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"flag"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -11,7 +12,6 @@ import (
 
 const host = "localhost:8021"
 
-var listener net.Listener
 var done chan bool
 var rootPath string
 
@@ -23,8 +23,7 @@ func init() {
 }
 
 func main() {
-	var err error
-	listener, err = net.Listen("tcp", host)
+	listener, err := net.Listen("tcp", host)
 	if err != nil {
 		panic(err)
 	}
@@ -39,15 +38,17 @@ func main() {
 	//
 	log.Printf("Starting FTP with root folder:\n\t> %s\n", rootPath)
 
-	if _, err := os.Open(rootPath); err != nil {
+	if f, err := os.Open(rootPath); err != nil {
 		panic(err)
+	} else {
+		defer f.Close()
 	}
 
-	go loop()
+	go loop(listener)
 	<-done
 }
 
-func handler(c net.Conn) {
+func handler(c io.ReadWriteCloser) {
 	defer c.Close()
 	ftp := newFtp(rootPath)
 	input := bufio.NewScanner(c)
@@ -62,7 +63,7 @@ func handler(c net.Conn) {
 	log.Println("Client disconnected")
 }
 
-func loop() {
+func loop(listener net.Listener) {
 	for {
 		if conn, err := listener.Accept(); err == nil {
 			log.Println("Client connected!")

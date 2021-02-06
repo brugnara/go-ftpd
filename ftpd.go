@@ -64,13 +64,13 @@ func (f *ftpd) command(c io.Writer, cmd string) bool {
 	xc := splitter(cmd)
 
 	if len(xc) == 0 {
-		fmt.Fprintf(c, "%s\n", errorInvalidCommand)
+		fmt.Fprintf(c, "%s - '%s'\n", errorInvalidCommand, "<no command>")
 		return false
 	}
 
 	switch xc[0] {
 	default:
-		fmt.Fprintf(c, "%s\n", errorInvalidCommand)
+		fmt.Fprintf(c, "%s - '%s'\n", errorInvalidCommand, xc[0])
 		return false
 	case "cd":
 		if len(xc) != 2 {
