@@ -2,6 +2,8 @@ Go FTP
 ======
 > A simple FTP Server, in Go
 
+[![Coverage Status](https://coveralls.io/repos/github/brugnara/go-ftpd/badge.svg?branch=main)](https://coveralls.io/github/brugnara/go-ftpd?branch=main)
+
 As a default behaviour, `./public` folder with examples is served.
 
 ```bash
