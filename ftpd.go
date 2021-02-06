@@ -95,7 +95,7 @@ func (f ftp) wannaBe(dir string) (string, error) {
 	if !strings.HasPrefix(p, f.root) {
 		p = path.Join(f.root, p)
 	}
-	p = strings.ReplaceAll(p, ".", "")
+	p = strings.ReplaceAll(p, "..", "")
 	// check existance
 	if _, err := os.Open(p); err != nil {
 		return f.path, err
@@ -146,21 +146,29 @@ func (f ftp) currentPath() string {
 }
 
 func (f ftp) cat(c io.Writer, file string) {
-	fl, err := os.Open(path.Join(f.root, f.currentPath(), file))
-	if err != nil {
+	quitError := func(err error, output string) {
 		log.Println(err)
-		fmt.Fprintln(c, errorGeneric)
+		fmt.Fprintln(c, output)
+	}
+	//
+	file, err := f.wannaBe(file)
+	if err != nil {
+		quitError(err, errorCantOpenDir)
+		return
+	}
+	fl, err := os.Open(file)
+	if err != nil {
+		quitError(err, errorCantOpenDir)
 		return
 	}
 	defer fl.Close()
 	stat, err := fl.Stat()
 	if err != nil || stat.IsDir() {
-		log.Println(err)
-		fmt.Fprintln(c, errorCantOpenDir)
+		quitError(err, errorCantOpenDir)
 		return
 	}
 	if stat.Size() > pow(1024, 2) {
-		fmt.Fprintln(c, errorFileTooBig)
+		quitError(nil, errorFileTooBig)
 		return
 	}
 	io.Copy(c, fl)
