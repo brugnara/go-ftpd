@@ -38,14 +38,23 @@ func main() {
 	//
 	log.Printf("Starting FTP with root folder:\n\t> %s\n", rootPath)
 
-	if f, err := os.Open(rootPath); err != nil {
-		panic(err)
-	} else {
-		defer f.Close()
+	if !validPath(rootPath) {
+		panic("Invalid path")
 	}
 
-	go loop(listener)
-	<-done
+	stop := false
+
+	go loop(listener, &stop)
+	stop = <-done
+}
+
+func validPath(p string) (valid bool) {
+	f, err := os.Open(p)
+	if err == nil {
+		defer f.Close()
+		valid = true
+	}
+	return
 }
 
 func handler(c io.ReadWriteCloser) {
@@ -63,11 +72,15 @@ func handler(c io.ReadWriteCloser) {
 	log.Println("Client disconnected")
 }
 
-func loop(listener net.Listener) {
+func loop(listener net.Listener, stopped *bool) {
 	for {
 		if conn, err := listener.Accept(); err == nil {
 			log.Println("Client connected!")
 			go handler(conn)
+		}
+		// stop after at least one round
+		if *stopped {
+			return
 		}
 	}
 }
